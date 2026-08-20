@@ -1,0 +1,27 @@
+---
+---
+
+<div class="scrim" id="scrim"></div>
+
+<aside class="sheet" id="drawer" role="dialog" aria-modal="true" aria-labelledby="dTitle">
+  <div class="shead">
+    <button class="x" id="dClose" type="button" aria-label="Close">ESC ✕</button>
+    <div class="kicker" id="dVoicing"></div>
+    <h2 id="dTitle"></h2>
+    <div class="sub" id="dComposer"></div>
+  </div>
+
+  <div class="sbody">
+    <span class="pill" id="dFolder"><span class="pip" aria-hidden="true"></span><span id="dFolderText"></span></span>
+    <dl class="dl" id="dList"></dl>
+  </div>
+
+  <div class="sfoot">
+    <a class="btn primary" id="dScore" href="#" target="_blank" rel="noopener">Open score</a>
+    <a class="btn ghost" id="dMinus" href="#" target="_blank" rel="noopener">Minus one</a>
+    {/* vocalGuideUrl may be a single file or a Drive folder of per-part guides;
+        the choir is not consistent, so it is treated as an opaque link. */}
+    <a class="btn ghost" id="dGuide" href="#" target="_blank" rel="noopener">Vocal guides</a>
+    <div class="note">Sign in with your choir Google account</div>
+  </div>
+</aside>

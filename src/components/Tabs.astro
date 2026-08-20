@@ -1,0 +1,33 @@
+---
+const { inFolders, total, concerts } = Astro.props;
+---
+
+<div class="tabwrap">
+  <div class="tabs" id="tabs" role="tablist" aria-label="Which part of the catalogue">
+    <span class="slider" id="slider" aria-hidden="true"></span>
+
+    <button class="tab" role="tab" type="button" data-tab="folders" aria-selected="true" aria-controls="results">
+      In the folders <span class="n">{inFolders}</span>
+    </button>
+
+    {
+      concerts.map((c) => (
+        <button
+          class="tab"
+          role="tab"
+          type="button"
+          data-tab={`occasion:${c.occasion}`}
+          data-blurb={c.blurb}
+          aria-selected="false"
+          aria-controls="results"
+        >
+          {c.short} <span class="n">{c.count}</span>
+        </button>
+      ))
+    }
+
+    <button class="tab" role="tab" type="button" data-tab="library" aria-selected="false" aria-controls="results">
+      Full library <span class="n">{total}</span>
+    </button>
+  </div>
+</div>

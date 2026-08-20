@@ -1,0 +1,15 @@
+{
+  "name": "USC Choristers — Music Library",
+  "short_name": "Choristers",
+  "description": "The choir's repertoire catalogue. Scores open in the choir's Google Drive.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0e14",
+  "theme_color": "#0b0e14",
+  "icons": [
+    { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.astro/
+.DS_Store
+*.log
+
+# Never commit deploy hooks, service-account keys, or the Sheet export token.
+.env
+.env.*
+.dev.vars

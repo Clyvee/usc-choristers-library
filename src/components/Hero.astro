@@ -1,0 +1,22 @@
+---
+const { inFolders, total, totalSets, updated } = Astro.props;
+---
+
+<header class="hero">
+  <div class="hero-in">
+    <h1><span>Music</span> <span><em>Library</em></span></h1>
+
+    {/* The last two figures are reference, not orientation. They wrap to a
+        second line on a phone and cost a row of music, so they drop below
+        640px — the counts that matter are already on the tabs. */}
+    <div class="ledger">
+      <span><b>{inFolders}</b> in the folders</span>
+      <span><b>{total}</b> in the library</span>
+      <span class="lg-extra"><b>{totalSets}</b> folder sets</span>
+      <span class="lg-extra">updated <b>{updated}</b></span>
+    </div>
+
+    <div class="spectrum" id="spectrum" role="group" aria-label="Filter by genre"></div>
+    <div class="speclabel" id="specLabel" data-show="false" aria-live="polite"></div>
+  </div>
+</header>

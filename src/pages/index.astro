@@ -1,0 +1,717 @@
+---
+import Base from "../layouts/Base.astro";
+import Masthead from "../components/Masthead.astro";
+import Hero from "../components/Hero.astro";
+import Tabs from "../components/Tabs.astro";
+import Controls from "../components/Controls.astro";
+import Toolbar from "../components/Toolbar.astro";
+import Piece from "../components/Piece.astro";
+import Drawer from "../components/Drawer.astro";
+import Settings from "../components/Settings.astro";
+import Footer from "../components/Footer.astro";
+
+import catalog from "../data/pieces.json";
+import { byTitle, shelfLetter, OCCASION_ORDER, CONCERT_TABS } from "../lib/catalog.js";
+
+// pieces.json is the contract with the data side. Archived pieces and pieces
+// with no scoreUrl are already dropped by the build step that writes it.
+const pieces = [...catalog.pieces].sort(byTitle);
+const folderPieces = pieces.filter((p) => p.inFolders);
+const totalSets = catalog.totalSets;
+
+const updated = new Date(catalog.generatedAt).toLocaleDateString("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+/* ---------------------------------------------------------------------------
+   Three groupings, one DOM.
+
+   Folders groups by occasion in fixed calendar order; concert tabs group by
+   whether a piece is in the folders or the cabinet; the library groups
+   alphabetically. Every row and header carries all three positions, and
+   switching tabs reorders the DOM.
+
+   CSS `order` was the obvious alternative and is wrong: it reorders what you
+   see without reordering focus, so a keyboard user would tab through rows in
+   a different sequence than the one on screen. Markup is emitted in occasion
+   order, so the default tab is correct at first paint before any script runs.
+------------------------------------------------------------------------- */
+
+const libSeq = [];
+let seenLetter = "";
+for (const p of pieces) {
+  const letter = shelfLetter(p.title);
+  if (letter !== seenLetter) {
+    seenLetter = letter;
+    libSeq.push({ kind: "letter", letter });
+  }
+  libSeq.push({ kind: "piece", p });
+}
+const libOrder = new Map();
+libSeq.forEach((it, i) =>
+  libOrder.set(it.kind === "piece" ? `p${it.p.id}` : `L${it.letter}`, i)
+);
+
+const occSeq = [];
+const occasionsPresent = OCCASION_ORDER.filter((o) =>
+  folderPieces.some((p) => p.occasion === o)
+);
+for (const occasion of occasionsPresent) {
+  occSeq.push({ kind: "occasion", occasion });
+  for (const p of folderPieces.filter((p) => p.occasion === occasion))
+    occSeq.push({ kind: "piece", p });
+}
+const occOrder = new Map();
+occSeq.forEach((it, i) =>
+  occOrder.set(it.kind === "piece" ? `p${it.p.id}` : `O${it.occasion}`, i)
+);
+const OCC_TAIL = occSeq.length;
+pieces.filter((p) => !p.inFolders).forEach((p, i) => occOrder.set(`p${p.id}`, OCC_TAIL + i));
+
+// A concert tab shows every piece for that occasion, including music still in
+// the cabinet — next Christmas's programme is partly not in the folders yet,
+// and that gap is exactly what needs to be visible.
+const statSeq = [
+  { kind: "status", status: "folders", label: "In the folders" },
+  ...pieces.filter((p) => p.inFolders),
+  { kind: "status", status: "cabinet", label: "Resting in the cabinet" },
+  ...pieces.filter((p) => !p.inFolders),
+];
+const statOrder = new Map();
+statSeq.forEach((it, i) =>
+  statOrder.set(it.kind === "status" ? `S${it.status}` : `p${it.id}`, i)
+);
+
+const concerts = CONCERT_TABS.filter((o) => pieces.some((p) => p.occasion === o)).map(
+  (occasion) => ({
+    occasion,
+    short: occasion.replace(/ Concert$/, ""),
+    count: pieces.filter((p) => p.occasion === occasion).length,
+  })
+);
+
+const letterHeaders = [...new Set(pieces.map((p) => shelfLetter(p.title)))];
+
+// Emission order is occasion order, so the default tab is right at first paint.
+const emitted = [];
+for (const it of occSeq) {
+  if (it.kind === "occasion")
+    emitted.push({ kind: "occasion", occasion: it.occasion,
+      occ: occOrder.get(`O${it.occasion}`), lib: -1, stat: -1 });
+  else
+    emitted.push({ kind: "piece", p: it.p, occ: occOrder.get(`p${it.p.id}`),
+      lib: libOrder.get(`p${it.p.id}`), stat: statOrder.get(`p${it.p.id}`) });
+}
+for (const p of pieces.filter((p) => !p.inFolders))
+  emitted.push({ kind: "piece", p, occ: occOrder.get(`p${p.id}`),
+    lib: libOrder.get(`p${p.id}`), stat: statOrder.get(`p${p.id}`) });
+for (const letter of letterHeaders)
+  emitted.push({ kind: "letter", letter, occ: 100000,
+    lib: libOrder.get(`L${letter}`), stat: -1 });
+for (const it of statSeq.filter((i) => i.kind === "status"))
+  emitted.push({ kind: "status", status: it.status, label: it.label,
+    occ: 100000, lib: -1, stat: statOrder.get(`S${it.status}`) });
+---
+
+<Base>
+  <Masthead />
+  <Hero
+    inFolders={folderPieces.length}
+    total={pieces.length}
+    totalSets={totalSets}
+    updated={updated}
+  />
+  <Tabs inFolders={folderPieces.length} total={pieces.length} concerts={concerts} />
+  <Controls pieces={pieces} />
+  <Toolbar />
+
+  <main>
+    <div class="results" id="results" data-view="list" data-group="occasion">
+      {
+        emitted.map((item) =>
+          item.kind === "occasion" ? (
+            <div class="gh gh--occasion" data-kind="occasion" data-occasion={item.occasion}
+                 data-occ-order={item.occ} data-lib-order={item.lib} data-stat-order={item.stat}>
+              {item.occasion}<span class="ghn" data-ghn />
+            </div>
+          ) : item.kind === "letter" ? (
+            <div class="gh gh--letter" data-kind="letter" data-letter={item.letter}
+                 data-occ-order={item.occ} data-lib-order={item.lib} data-stat-order={item.stat}>
+              {item.letter}
+            </div>
+          ) : item.kind === "status" ? (
+            <div class="gh gh--status" data-kind="status" data-status={item.status}
+                 data-occ-order={item.occ} data-lib-order={item.lib} data-stat-order={item.stat}>
+              {item.label}<span class="ghn" data-ghn />
+            </div>
+          ) : (
+            <Piece piece={item.p} letter={shelfLetter(item.p.title)}
+                   libOrder={item.lib} occOrder={item.occ} statOrder={item.stat} />
+          )
+        )
+      }
+
+      <div class="empty" id="empty" hidden>
+        <div class="mark" aria-hidden="true"></div>
+        <p>Nothing on that shelf.</p>
+        <div class="hint">Try another spelling, or clear what's selected</div>
+        <button class="chip" id="eClear" type="button" style="border-color:var(--line)">
+          Clear all filters
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <Footer />
+  <Drawer />
+  <Settings />
+</Base>
+
+<script>
+  /* -------------------------------------------------------------------------
+     Every row and header is already in the HTML. This script shows, hides and
+     reorders them, so the payload stays small and the music is readable the
+     instant the document paints — the point, on a phone, in a rehearsal hall.
+     ---------------------------------------------------------------------- */
+
+  const $ = (s) => document.querySelector(s);
+  const box = $("#results");
+  const rows = [...document.querySelectorAll(".piece")];
+  const occHeads = [...document.querySelectorAll('.gh[data-kind="occasion"]')];
+  const letterHeads = [...document.querySelectorAll('.gh[data-kind="letter"]')];
+  const statHeads = [...document.querySelectorAll('.gh[data-kind="status"]')];
+  const tabs = [...document.querySelectorAll(".tab")];
+  const FINE = matchMedia("(hover:hover) and (pointer:fine)");
+  const GENRE_ORDER = [...new Set(rows.map((r) => r.dataset.genre))];
+
+  const state = {
+    tab: "folders", q: "", view: "list",
+    genres: new Set(), occasions: new Set(), voicings: new Set(), audio: new Set(),
+  };
+
+  const TOTAL = rows.length;
+  const FOLDER_TOTAL = rows.filter((r) => r.dataset.infolders === "true").length;
+
+  /* ---- grouping: reorder the DOM so focus order matches the screen -------- */
+  const groupable = [...box.children].filter((el) => el.id !== "empty");
+  const ORDER_KEY = { occasion: "occOrder", letter: "libOrder", status: "statOrder" };
+  let domGroup = "occasion";
+  function applyGrouping(group) {
+    if (group === domGroup) return;
+    const key = ORDER_KEY[group];
+    const frag = document.createDocumentFragment();
+    for (const el of [...groupable].sort((a, b) => a.dataset[key] - b.dataset[key]))
+      frag.appendChild(el);
+    box.insertBefore(frag, $("#empty"));
+    domGroup = group;
+  }
+
+  /* ---- filtering --------------------------------------------------------- */
+  const tabKind = () =>
+    state.tab === "folders" || state.tab === "library" ? state.tab : "occasion";
+
+  function inTab(el) {
+    if (state.tab === "library") return true;
+    if (state.tab === "folders") return el.dataset.infolders === "true";
+    return el.dataset.occasion === state.tab.slice("occasion:".length);
+  }
+
+  function visible(el) {
+    if (!inTab(el)) return false;
+    const q = state.q.trim().toLowerCase();
+    if (q && !el.dataset.search.includes(q)) return false;
+    if (state.genres.size && !state.genres.has(el.dataset.genre)) return false;
+    if (state.occasions.size && !state.occasions.has(el.dataset.occasion)) return false;
+    if (state.voicings.size && !state.voicings.has(el.dataset.voicing)) return false;
+    if (state.audio.has("minus") && el.dataset.hasminus !== "true") return false;
+    if (state.audio.has("guide") && el.dataset.hasguide !== "true") return false;
+    return true;
+  }
+
+  /* ---- genre spectrum ---------------------------------------------------- */
+  let specTimer = null;
+  function showSpecLabel(t) {
+    const l = $("#specLabel");
+    l.textContent = t;
+    l.dataset.show = "true";
+  }
+  function drawSpectrum() {
+    const scope = rows.filter(inTab);
+    const counts = GENRE_ORDER
+      .map((g) => [g, scope.filter((r) => r.dataset.genre === g).length])
+      .filter(([, n]) => n > 0);
+    const total = counts.reduce((a, [, n]) => a + n, 0) || 1;
+    const bar = $("#spectrum");
+    const existing = new Map([...bar.children].map((b) => [b.dataset.value, b]));
+    bar.textContent = "";
+    for (const [g, n] of counts) {
+      const b = existing.get(g) || document.createElement("button");
+      b.type = "button";
+      b.dataset.value = g;
+      b.style.setProperty("--sc", genreColor(g));
+      b.setAttribute("aria-pressed", String(state.genres.has(g)));
+      b.setAttribute("aria-label", `${g}, ${n} ${n === 1 ? "piece" : "pieces"}`);
+      b.title = `${g} · ${n}`;
+      bar.appendChild(b);
+      requestAnimationFrame(() => {
+        b.style.width = (n / total) * 100 + "%";
+      });
+      b.onmouseenter = () => { if (FINE.matches) showSpecLabel(`${g} — ${n}`); };
+      b.onmouseleave = () => { if (FINE.matches) $("#specLabel").dataset.show = "false"; };
+      b.onclick = () => {
+        const on = !state.genres.has(g);
+        on ? state.genres.add(g) : state.genres.delete(g);
+        document.querySelectorAll('.chip[data-filter="genre"]').forEach((c) =>
+          c.setAttribute("aria-pressed", String(state.genres.has(c.dataset.value)))
+        );
+        // On touch there is no hover to explain what the bar did, so it says so.
+        showSpecLabel(on ? `${g} — showing ${n}` : "Showing everything");
+        if (!FINE.matches) {
+          clearTimeout(specTimer);
+          specTimer = setTimeout(() => {
+            if (!state.genres.size) $("#specLabel").dataset.show = "false";
+          }, 2600);
+        }
+        render();
+      };
+    }
+  }
+  /**
+   * The chips already carry the resolved genre colour, so read it from there
+   * rather than duplicating the genre-to-colour map in the client script.
+   *
+   * getComputedStyle resolves a custom property all the way to its final value
+   * — "#9b7ed0", not "var(--violet)". Re-wrapping that in var() produces
+   * var(--#9b7ed0), which is invalid, and the segment silently renders with no
+   * background at all. Use the resolved colour directly.
+   */
+  const genreColorCache = new Map();
+  function genreColor(g) {
+    if (genreColorCache.has(g)) return genreColorCache.get(g);
+    const chip = document.querySelector(`.chip[data-filter="genre"][data-value="${CSS.escape(g)}"]`);
+    const v = (chip && getComputedStyle(chip).getPropertyValue("--sc").trim()) || "";
+    const out = v || "var(--neutral)";
+    genreColorCache.set(g, out);
+    return out;
+  }
+
+  /* ---- reveal on scroll -------------------------------------------------- */
+  let io = null;
+  function observeRows() {
+    io?.disconnect();
+    const reduced =
+      document.documentElement.dataset.motion === "off" ||
+      matchMedia("(prefers-reduced-motion:reduce)").matches;
+    if (reduced) {
+      rows.forEach((r) => r.classList.remove("reveal"));
+      return;
+    }
+    io = new IntersectionObserver(
+      (es) => {
+        for (const e of es)
+          if (e.isIntersecting) {
+            e.target.classList.add("in");
+            io.unobserve(e.target);
+          }
+      },
+      { rootMargin: "0px 0px -6% 0px", threshold: 0.02 }
+    );
+    rows.filter((r) => !r.hidden && !r.classList.contains("in")).forEach((el) => {
+      el.classList.add("reveal");
+      io.observe(el);
+    });
+    requestAnimationFrame(() =>
+      rows.forEach((el) => {
+        if (!el.hidden && el.getBoundingClientRect().top < innerHeight) el.classList.add("in");
+      })
+    );
+  }
+
+  const odometer = (n) =>
+    `<span class="odo">${String(n)
+      .split("")
+      .map((d, i) => `<span style="animation-delay:${i * 45}ms">${d}</span>`)
+      .join("")}</span>`;
+
+  /* ---- render ------------------------------------------------------------ */
+  function render() {
+    const kind = tabKind();
+    const folders = kind === "folders";
+    const concert = kind === "occasion";
+
+    const group = folders ? "occasion" : concert ? "status" : "letter";
+    box.dataset.view = kind === "library" ? state.view : "list";
+    box.dataset.group = group;
+    applyGrouping(group);
+    $("#views").hidden = kind !== "library";
+
+    let shown = 0;
+    for (const el of rows) {
+      const ok = visible(el);
+      el.hidden = !ok;
+      if (ok) shown++;
+    }
+
+    // A header only appears when something is filed under it, so filtering
+    // never leaves a heading stranded above nothing.
+    const setHeads = (heads, on, countFor) => {
+      for (const h of heads) {
+        if (!on) { h.hidden = true; continue; }
+        const n = countFor(h);
+        h.hidden = n === 0;
+        const slot = h.querySelector("[data-ghn]");
+        if (slot) slot.textContent = n ? String(n) : "";
+      }
+    };
+    setHeads(occHeads, folders, (h) =>
+      rows.filter((r) => !r.hidden && r.dataset.occasion === h.dataset.occasion).length);
+    setHeads(letterHeads, kind === "library", (h) =>
+      rows.filter((r) => !r.hidden && r.dataset.letter === h.dataset.letter).length);
+    setHeads(statHeads, concert, (h) =>
+      rows.filter((r) => !r.hidden && (r.dataset.infolders === "true") === (h.dataset.status === "folders")).length);
+
+    // The first visible header loses its top padding, whichever one it is.
+    const heads = [...occHeads, ...letterHeads, ...statHeads];
+    heads.forEach((h) => h.removeAttribute("data-first"));
+    const first = [...box.children].find((el) => !el.hidden && el.classList.contains("gh"));
+    if (first) first.dataset.first = "true";
+
+    const chosen =
+      state.genres.size + state.occasions.size + state.voicings.size + state.audio.size;
+    $("#clearBtn").hidden = chosen + (state.q.trim() ? 1 : 0) === 0;
+    $("#fCount").hidden = chosen === 0;
+    $("#fCount").textContent = String(chosen);
+
+    const scope = folders
+      ? FOLDER_TOTAL
+      : concert
+        ? rows.filter(inTab).length
+        : TOTAL;
+    $("#count").innerHTML =
+      shown === scope ? `${odometer(shown)} pieces` : `${odometer(shown)} of ${scope} pieces`;
+
+    $("#empty").hidden = shown !== 0;
+    // On a phone the count row only earns its space once it says something the
+    // tabs do not already say.
+    document.body.classList.toggle(
+      "has-meta",
+      chosen > 0 || state.q.trim() !== "" || kind === "library"
+    );
+    drawSpectrum();
+    moveSlider();
+    observeRows();
+  }
+
+  function moveSlider() {
+    const el = tabs.find((t) => t.getAttribute("aria-selected") === "true");
+    if (!el) return;
+    const s = $("#slider");
+    s.style.width = el.offsetWidth + "px";
+    s.style.transform = `translateX(${el.offsetLeft}px)`;
+
+    // The strip is wider than a phone, so the selected tab has to be brought
+    // into view. Without this the page can open showing the last three tabs
+    // while the first one is the active one, off-screen to the left.
+    const strip = $("#tabs");
+    const t = el.getBoundingClientRect();
+    const c = strip.getBoundingClientRect();
+    if (t.left < c.left + 8 || t.right > c.right - 8) {
+      strip.scrollTo({
+        left: el.offsetLeft - (strip.clientWidth - el.offsetWidth) / 2,
+        behavior: document.documentElement.dataset.motion === "off" ? "auto" : "smooth",
+      });
+    }
+  }
+
+  /* ---- filters ----------------------------------------------------------- */
+  const setFor = (k) =>
+    ({ genre: state.genres, occasion: state.occasions, voicing: state.voicings, audio: state.audio })[k];
+
+  document.querySelectorAll(".chip[data-filter]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const set = setFor(chip.dataset.filter);
+      const key = chip.dataset.value;
+      set.has(key) ? set.delete(key) : set.add(key);
+      chip.setAttribute("aria-pressed", String(set.has(key)));
+      render();
+    });
+  });
+
+  function clearAll() {
+    state.q = "";
+    $("#q").value = "";
+    state.genres.clear(); state.occasions.clear(); state.voicings.clear(); state.audio.clear();
+    document.querySelectorAll(".chip[data-filter]").forEach((c) =>
+      c.setAttribute("aria-pressed", "false"));
+    $("#specLabel").dataset.show = "false";
+    render();
+  }
+  $("#q").addEventListener("input", (e) => { state.q = e.target.value; render(); });
+  $("#clearBtn").addEventListener("click", clearAll);
+  $("#eClear").addEventListener("click", clearAll);
+  $("#fBtn").addEventListener("click", () => {
+    const open = $("#fPanel").dataset.open !== "true";
+    $("#fPanel").dataset.open = String(open);
+    $("#fBtn").setAttribute("aria-expanded", String(open));
+  });
+
+  /* ---- tabs and view ----------------------------------------------------- */
+  tabs.forEach((b, idx) =>
+    b.addEventListener("click", () => {
+      const from = tabs.findIndex((t) => t.getAttribute("aria-selected") === "true");
+      if (from === idx) return;
+      state.tab = b.dataset.tab;
+      tabs.forEach((t) => t.setAttribute("aria-selected", String(t === b)));
+      render();
+      // Slide in from the side you came from, so tabs and list agree.
+      box.style.setProperty("--dir", (idx > from ? 1 : -1) * 26 + "px");
+      box.classList.remove("shift");
+      void box.offsetWidth;
+      box.classList.add("shift");
+    })
+  );
+
+  function setView(v) {
+    state.view = v;
+    $("#listBtn").setAttribute("aria-pressed", String(v === "list"));
+    $("#cardBtn").setAttribute("aria-pressed", String(v === "cards"));
+    render();
+  }
+  $("#listBtn").addEventListener("click", () => setView("list"));
+  $("#cardBtn").addEventListener("click", () => setView("cards"));
+
+  /* ---- pointer: mouse only ----------------------------------------------- */
+  let ptrQueued = false, ptrEvt = null;
+  box.addEventListener("pointermove", (e) => {
+    // A phone fires pointermove from your finger, which is already covering
+    // the thing this would highlight. Mouse and trackpad only.
+    if (!FINE.matches || document.documentElement.dataset.motion === "off") return;
+    ptrEvt = e;
+    if (ptrQueued) return;
+    ptrQueued = true;
+    requestAnimationFrame(() => {
+      ptrQueued = false;
+      const row = ptrEvt.target.closest(".piece");
+      if (!row) return;
+      const r = row.getBoundingClientRect();
+      row.style.setProperty("--mx", ((ptrEvt.clientX - r.left) / r.width) * 100 + "%");
+      if (box.dataset.view === "cards") {
+        const px = (ptrEvt.clientX - r.left) / r.width - 0.5;
+        const py = (ptrEvt.clientY - r.top) / r.height - 0.5;
+        row.style.setProperty("--ry", (px * 4).toFixed(2) + "deg");
+        row.style.setProperty("--rx", (-py * 4).toFixed(2) + "deg");
+      }
+    });
+  });
+  box.addEventListener("pointerleave", () => {
+    rows.forEach((r) => { r.style.removeProperty("--rx"); r.style.removeProperty("--ry"); });
+  }, true);
+
+  /* ---- swipe between tabs on touch --------------------------------------- */
+  (function () {
+    let x0 = null, y0 = null, t0 = 0;
+    box.addEventListener("touchstart", (e) => {
+      if (e.touches.length !== 1) return;
+      x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
+    }, { passive: true });
+    box.addEventListener("touchend", (e) => {
+      if (x0 === null) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - x0, dy = t.clientY - y0, dt = Date.now() - t0;
+      x0 = null;
+      // Deliberate horizontal movement only, so scrolling never changes tab.
+      if (dt > 600 || Math.abs(dx) < 70 || Math.abs(dy) > 50) return;
+      const i = tabs.findIndex((b) => b.getAttribute("aria-selected") === "true");
+      const next = tabs[dx < 0 ? i + 1 : i - 1];
+      if (next) next.click();
+    }, { passive: true });
+  })();
+
+  /* ---- drawer ------------------------------------------------------------ */
+  let lastFocused = null;
+
+  function openDrawer(el) {
+    const d = el.dataset;
+    lastFocused = document.activeElement;
+    $("#drawer").style.setProperty("--sc", getComputedStyle(el).getPropertyValue("--sc"));
+    $("#dVoicing").textContent = d.voicing;
+    $("#dVoicing").style.color = getComputedStyle(el).getPropertyValue("--sc");
+    $("#dTitle").textContent = d.title;
+
+    $("#dComposer").textContent = d.composer;
+    if (d.arranger) {
+      const a = document.createElement("span");
+      a.style.opacity = ".7";
+      a.textContent = ` · arr. ${d.arranger}`;
+      $("#dComposer").appendChild(a);
+    }
+
+    const active = d.infolders === "true";
+    $("#dFolder").dataset.active = String(active);
+    $("#dFolderText").textContent = active ? "In the folders now" : "Resting in the cabinet";
+
+    const list = $("#dList");
+    list.textContent = "";
+    const facts = [
+      ["Catalogue no.", d.id], ["Subtitle", d.subtitle || "—"], ["Genre", d.genre],
+      ["Occasion", d.occasion || "—"], ["Accompaniment", d.accompaniment],
+      ["Language", d.language], ["Difficulty", d.difficulty], ["Duration", d.duration],
+      ["Copies", `${d.sets} sets`], ["Last performed", d.last],
+    ];
+    facts.forEach(([k, v], n) => {
+      const dt = document.createElement("dt");
+      dt.textContent = k;
+      dt.style.animationDelay = `${120 + n * 26}ms`;
+      const dd = document.createElement("dd");
+      dd.textContent = v;
+      dd.style.animationDelay = `${120 + n * 26}ms`;
+      list.append(dt, dd);
+    });
+
+    // Each action hides itself when its link is absent, rather than offering a
+    // dead button. Minus ones and vocal guides are uneven across the library.
+    $("#dScore").href = d.score;
+    for (const [id, url] of [["#dMinus", d.minus], ["#dGuide", d.guide]]) {
+      const btn = $(id);
+      btn.hidden = !url;
+      if (url) btn.href = url;
+    }
+
+    $("#drawer").dataset.open = "true";
+    $("#scrim").dataset.open = "true";
+    $("#dClose").focus();
+  }
+
+  function openSettings() {
+    lastFocused = document.activeElement;
+    $("#settings").dataset.open = "true";
+    $("#scrim").dataset.open = "true";
+    $("#setBtn").setAttribute("aria-expanded", "true");
+    requestAnimationFrame(applySettings);
+    $("#setClose").focus();
+  }
+
+  const panelOpen = () =>
+    $("#drawer").dataset.open === "true" || $("#settings").dataset.open === "true";
+
+  function closePanels() {
+    $("#drawer").dataset.open = "false";
+    $("#settings").dataset.open = "false";
+    $("#scrim").dataset.open = "false";
+    $("#setBtn").setAttribute("aria-expanded", "false");
+    if (lastFocused) lastFocused.focus();
+  }
+
+  for (const el of rows) {
+    el.addEventListener("click", (e) => {
+      // Score and the practice links are shortcuts past the drawer.
+      if (e.target.closest("a")) return;
+      openDrawer(el);
+    });
+    el.addEventListener("keydown", (e) => {
+      if (e.target !== el) return;
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDrawer(el); }
+    });
+  }
+  $("#dClose").addEventListener("click", closePanels);
+  $("#setClose").addEventListener("click", closePanels);
+  $("#scrim").addEventListener("click", closePanels);
+  $("#setBtn").addEventListener("click", openSettings);
+
+  /* ---- settings ---------------------------------------------------------- */
+  const DEFAULTS = { theme: "dark", textsize: "normal", density: "comfortable", view: "list", motion: "on" };
+  let settings = { ...DEFAULTS };
+  try {
+    settings = { ...DEFAULTS, ...(JSON.parse(localStorage.getItem("usc-settings") || "{}") || {}) };
+  } catch (e) { /* private mode; defaults stand */ }
+
+  const systemLight = matchMedia("(prefers-color-scheme: light)");
+
+  function applySettings() {
+    const d = document.documentElement;
+    d.dataset.theme =
+      settings.theme === "system" ? (systemLight.matches ? "light" : "dark") : settings.theme;
+    d.dataset.textsize = settings.textsize;
+    d.dataset.density = settings.density;
+    d.dataset.motion = settings.motion;
+
+    for (const g of document.querySelectorAll("[data-setting]")) {
+      const cur = settings[g.dataset.setting];
+      const btns = [...g.querySelectorAll("button[data-value]")];
+      btns.forEach((b) => b.setAttribute("aria-checked", String(b.dataset.value === cur)));
+      const on = btns.find((b) => b.dataset.value === cur);
+      const knob = g.querySelector(".knob");
+      if (on && knob) {
+        knob.style.width = on.offsetWidth + "px";
+        knob.style.transform = `translateX(${on.offsetLeft}px)`;
+      }
+    }
+
+    // Genre colours differ between themes, so the cache cannot outlive one.
+    genreColorCache.clear();
+    if (settings.view !== state.view) setView(settings.view);
+    else { drawSpectrum(); observeRows(); }
+  }
+
+  document.querySelectorAll("[data-setting]").forEach((g) =>
+    g.addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-value]");
+      if (!b) return;
+      settings[g.dataset.setting] = b.dataset.value;
+      if (g.dataset.setting === "theme" && document.startViewTransition &&
+          document.documentElement.dataset.motion !== "off") {
+        document.startViewTransition(() => applySettings());
+      } else applySettings();
+      try { localStorage.setItem("usc-settings", JSON.stringify(settings)); } catch (err) {}
+    })
+  );
+  systemLight.addEventListener("change", () => { if (settings.theme === "system") applySettings(); });
+  $("#setReset").addEventListener("click", () => {
+    settings = { ...DEFAULTS };
+    applySettings();
+    try { localStorage.setItem("usc-settings", JSON.stringify(settings)); } catch (err) {}
+  });
+
+  /* ---- keyboard and scroll ----------------------------------------------- */
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "/" && document.activeElement !== $("#q") && !panelOpen()) {
+      e.preventDefault();
+      $("#q").focus();
+    }
+    if (e.key === "Escape") {
+      if (panelOpen()) closePanels();
+      else if (state.q || state.genres.size || state.occasions.size ||
+               state.voicings.size || state.audio.size) clearAll();
+    }
+  });
+
+  addEventListener("scroll", () => {
+    document.body.classList.toggle("scrolled", scrollY > 8);
+    const max = document.body.scrollHeight - innerHeight;
+    $("#prog").style.transform = `scaleX(${max > 0 ? Math.min(scrollY / max, 1) : 0})`;
+  }, { passive: true });
+
+  addEventListener("resize", () => { moveSlider(); applySettings(); });
+
+
+  /* ---- easter egg --------------------------------------------------------
+     Hover opens it for a mouse (CSS). A finger has no hover, so the button
+     toggles it, and the button is also how a keyboard reaches it.
+     -------------------------------------------------------------------- */
+  const eggBtn = $("#eggBtn");
+  if (eggBtn) {
+    eggBtn.addEventListener("click", () => {
+      const panel = $("#egg");
+      const open = panel.dataset.open !== "true";
+      panel.dataset.open = String(open);
+      eggBtn.setAttribute("aria-expanded", String(open));
+      if (open) panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  }
+
+  applySettings();
+  render();
+  requestAnimationFrame(moveSlider);
+</script>

@@ -1,0 +1,70 @@
+---
+import { colorOf, mmss, fmtDate, haystack } from "../lib/catalog.js";
+
+const { piece: p, letter, libOrder, occOrder, statOrder } = Astro.props;
+
+// Genre leads, because genre is what the colour encodes.
+const meta = [p.genre, p.language].filter(Boolean).join(" · ");
+
+// The drawer reads everything off these attributes, so the page never ships a
+// second copy of the catalogue as JSON.
+const attrs = {
+  "data-id": String(p.id).padStart(3, "0"),
+  "data-title": p.title,
+  "data-subtitle": p.subtitle || "",
+  "data-composer": p.composer,
+  "data-arranger": p.arranger || "",
+  "data-voicing": p.voicing,
+  "data-accompaniment": p.accompaniment,
+  "data-language": p.language,
+  "data-genre": p.genre,
+  "data-occasion": p.occasion || "",
+  "data-difficulty": p.difficulty,
+  "data-duration": mmss(p.durationMin),
+  "data-sets": String(p.sets),
+  "data-last": fmtDate(p.lastPerformed),
+  "data-infolders": String(Boolean(p.inFolders)),
+  "data-score": p.scoreUrl,
+  "data-minus": p.minusOneUrl || "",
+  "data-guide": p.vocalGuideUrl || "",
+  "data-search": haystack(p),
+  "data-letter": letter,
+  "data-hasminus": String(Boolean(p.minusOneUrl)),
+  "data-hasguide": String(Boolean(p.vocalGuideUrl)),
+  // All three grouping positions. Switching tabs sorts the DOM on these so
+  // focus order always matches what is on screen.
+  "data-lib-order": String(libOrder),
+  "data-occ-order": String(occOrder),
+  "data-stat-order": String(statOrder),
+};
+---
+
+<div class="piece" role="button" tabindex="0" {...attrs} style={`--sc:${colorOf(p.genre)}`}>
+  <div class="pno">{String(p.id).padStart(3, "0")}</div>
+
+  <div class="voicing">{p.voicing}</div>
+
+  <div class="pbody">
+    <div class="ptitle">{p.title}</div>
+    <div class="psub">{meta} · {mmss(p.durationMin)}</div>
+  </div>
+
+  <div class="pcomposer">
+    {p.composer}{p.arranger && <span class="parr"><br />arr. {p.arranger}</span>}
+  </div>
+
+  {/* Practice audio, straight from the row, and only when the link exists. */}
+  <div class="aud">
+    {p.minusOneUrl && (
+      <a href={p.minusOneUrl} target="_blank" rel="noopener" title="Minus one"
+         aria-label={`Minus one for ${p.title}`}><span class="tri" aria-hidden="true" /></a>
+    )}
+    {p.vocalGuideUrl && (
+      <a href={p.vocalGuideUrl} target="_blank" rel="noopener" title="Vocal guides"
+         aria-label={`Vocal guides for ${p.title}`}><span class="ring" aria-hidden="true" /></a>
+    )}
+  </div>
+
+  <a class="scorelink" href={p.scoreUrl} target="_blank" rel="noopener"
+     aria-label={`Open the score for ${p.title}`}>Score<span class="arw" aria-hidden="true">→</span></a>
+</div>

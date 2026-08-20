@@ -1,0 +1,68 @@
+---
+import { GENRE_ORDER, OCCASION_ORDER, colorOf } from "../lib/catalog.js";
+
+const { pieces } = Astro.props;
+
+// Only render chips for values that occur. An empty category is a dead end,
+// and every chip costs a row of screen once the panel is open.
+const genres = GENRE_ORDER.filter((g) => pieces.some((p) => p.genre === g));
+const occasions = OCCASION_ORDER.filter((o) => pieces.some((p) => p.occasion === o));
+const voicings = [...new Set(pieces.map((p) => p.voicing))].sort((a, b) => a.localeCompare(b));
+---
+
+{/* One search field and one Filters control. The 29 chips live behind it, at
+    every screen width — expanded by default was most of the visual noise. */}
+<div class="bar">
+  <div class="searchwrap">
+    <input
+      id="q"
+      type="search"
+      placeholder="Search title, composer, arranger…"
+      autocomplete="off"
+      aria-label="Search the library"
+    />
+    <span class="slash" aria-hidden="true">/</span>
+  </div>
+  <button class="filterbtn" id="fBtn" type="button" aria-expanded="false" aria-controls="fPanel">
+    Filters<span class="badge" id="fCount" hidden>0</span><span class="chev" aria-hidden="true"></span>
+  </button>
+</div>
+
+<div class="panelwrap" id="fPanel" data-open="false">
+  <div class="panelinner">
+    <div class="filters">
+      <div class="frow">
+        <span class="flabel">Genre</span>
+        {
+          genres.map((g) => (
+            <button class="chip" type="button" data-filter="genre" data-value={g}
+                    aria-pressed="false" style={`--sc:${colorOf(g)}`}>
+              <span class="dot" aria-hidden="true" />{g}
+            </button>
+          ))
+        }
+      </div>
+      <div class="frow">
+        <span class="flabel">Occasion</span>
+        {
+          occasions.map((o) => (
+            <button class="chip" type="button" data-filter="occasion" data-value={o} aria-pressed="false">{o}</button>
+          ))
+        }
+      </div>
+      <div class="frow">
+        <span class="flabel">Practice</span>
+        <button class="chip" type="button" data-filter="audio" data-value="minus" aria-pressed="false">Has a minus one</button>
+        <button class="chip" type="button" data-filter="audio" data-value="guide" aria-pressed="false">Has vocal guides</button>
+      </div>
+      <div class="frow">
+        <span class="flabel">Voicing</span>
+        {
+          voicings.map((v) => (
+            <button class="chip" type="button" data-filter="voicing" data-value={v} aria-pressed="false">{v}</button>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</div>

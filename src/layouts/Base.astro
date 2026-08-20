@@ -1,0 +1,53 @@
+---
+import "../styles/global.css";
+
+const { title = "USC Choristers — Music Library", description = "" } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark" data-textsize="normal" data-density="comfortable" data-motion="on">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+    <meta name="color-scheme" content="dark light" />
+
+    <!-- The site is public; the scores are not. Keep the repertoire out of
+         search results so it isn't indexed alongside Drive links. -->
+    <meta name="robots" content="noindex, nofollow" />
+
+    <link rel="icon" href="/brand/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <!-- Matches the dark page ground, so adding it to a home screen and opening
+         it does not flash white before the catalogue paints. -->
+    <meta name="theme-color" content="#0b0e14" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f7f5ef" media="(prefers-color-scheme: light)" />
+    <meta name="apple-mobile-web-app-title" content="Choristers" />
+
+    <link rel="preload" href="/fonts/eb-garamond-500.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/ibm-plex-sans-400.woff2" as="font" type="font/woff2" crossorigin />
+
+    <!-- Applies saved preferences before first paint, so someone who chose
+         light mode or larger type never sees a flash of the default. -->
+    <script is:inline>
+      (function () {
+        var d = document.documentElement;
+        var s = {};
+        try { s = JSON.parse(localStorage.getItem("usc-settings") || "{}") || {}; }
+        catch (e) { /* private mode; fall through to defaults */ }
+        var t = s.theme || "dark";
+        if (t === "system") t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        d.dataset.theme = t === "light" ? "light" : "dark";
+        d.dataset.textsize = s.textsize || "normal";
+        d.dataset.density = s.density || "comfortable";
+        d.dataset.motion = s.motion || "on";
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#results">Skip to the music</a>
+    <slot />
+  </body>
+</html>

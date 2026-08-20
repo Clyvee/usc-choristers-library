@@ -1,0 +1,58 @@
+---
+/**
+ * Per-device preferences in localStorage under "usc-settings", applied by the
+ * inline bootstrap in Base.astro before first paint so nothing flashes.
+ */
+const groups = [
+  { key: "theme", label: "Appearance", hint: "Dark is the default. Rehearsal halls are dim.",
+    opts: [["dark", "Dark"], ["light", "Light"], ["system", "Match device"]] },
+  { key: "textsize", label: "Text size", hint: "Larger type for reading a title at arm's length.",
+    opts: [["normal", "Normal"], ["large", "Large"], ["xlarge", "Largest"]] },
+  { key: "density", label: "Row spacing", hint: "Compact fits more of a 50-piece rotation on screen.",
+    opts: [["comfortable", "Comfortable"], ["compact", "Compact"]] },
+  { key: "view", label: "Library view", hint: "How the full library opens. Other tabs are always lists.",
+    opts: [["list", "List"], ["cards", "Cards"]] },
+  { key: "motion", label: "Animation", hint: "Your device setting is respected either way.",
+    opts: [["on", "On"], ["off", "Reduced"]] },
+];
+---
+
+<aside class="sheet" id="settings" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+  <div class="shead">
+    <button class="x" id="setClose" type="button" aria-label="Close settings">ESC ✕</button>
+    <div class="kicker">Preferences</div>
+    <h2 id="setTitle">Settings</h2>
+    <div class="sub">Saved on this device</div>
+  </div>
+
+  <div class="sbody">
+    {
+      groups.map((g) => (
+        <section class="setgrp">
+          <h3 id={`set-${g.key}`}>{g.label}</h3>
+          <div class="seg" data-setting={g.key} role="radiogroup" aria-labelledby={`set-${g.key}`}>
+            <span class="knob" aria-hidden="true" />
+            {g.opts.map(([v, l]) => (
+              <button type="button" role="radio" aria-checked="false" data-value={v}>{l}</button>
+            ))}
+          </div>
+          <p class="sethint">{g.hint}</p>
+        </section>
+      ))
+    }
+
+    <section class="setgrp">
+      <h3>Keyboard</h3>
+      <dl class="dl">
+        <dt>/</dt><dd>Jump to search</dd>
+        <dt>Esc</dt><dd>Close this, or clear the search</dd>
+        <dt>Enter</dt><dd>Open the highlighted piece</dd>
+      </dl>
+    </section>
+  </div>
+
+  <div class="sfoot">
+    <button class="btn ghost" id="setReset" type="button">Reset to defaults</button>
+    <div class="note">No account, nothing sent anywhere</div>
+  </div>
+</aside>

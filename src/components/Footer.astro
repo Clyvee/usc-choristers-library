@@ -1,0 +1,66 @@
+---
+/**
+ * The footer carries an easter egg: "Meet the creators" opens two pinned
+ * portraits. It expands in flow rather than floating, so it cannot overflow a
+ * phone, and it opens on hover for a mouse and on tap for a finger.
+ */
+const creators = [
+  {
+    file: "kurt",
+    name: "Kurt",
+    part: "Bass 2",
+    quote: "If you see this, just know that the basses are the champions",
+    tone: "gold",
+  },
+  {
+    file: "kent",
+    name: "Kent",
+    part: "Bass 2",
+    quote: "What he said",
+    tone: "green",
+  },
+];
+---
+
+<footer>
+  {/* The emblem in its own colours, down here where nothing competes. */}
+  <img class="crest" src="/brand/mark.png" width="80" height="80"
+       alt="University of San Carlos Choristers" loading="lazy" decoding="async" />
+
+  <span class="foot-lines">
+    <span>Catalogue established 2026 &middot; USC Choristers</span>
+    <span>Scores open in the choir&rsquo;s Google Drive</span>
+  </span>
+
+  <div class="egg-wrap" id="eggWrap">
+    <button class="egg" id="eggBtn" type="button" aria-expanded="false" aria-controls="egg">
+      Meet the creators
+    </button>
+
+    <div class="egg-panel" id="egg" data-open="false">
+      <div class="egg-inner">
+        <div class="creators">
+          {
+            creators.map((c) => (
+              <figure class="creator" data-tone={c.tone}>
+                <span class="tape" aria-hidden="true" />
+                <img src={`/brand/${c.file}.jpg`} width="440" height="440"
+                     alt={c.name} loading="lazy" decoding="async" />
+                <figcaption>
+                  <span class="crow">
+                    <span class="cname">{c.name}</span>
+                    <span class="cpart">{c.part}</span>
+                  </span>
+                  <blockquote>{c.quote}</blockquote>
+                </figcaption>
+              </figure>
+            ))
+          }
+          <span class="spark s1" aria-hidden="true"></span>
+          <span class="spark s2" aria-hidden="true"></span>
+          <span class="spark s3" aria-hidden="true"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
